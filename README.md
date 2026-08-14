@@ -190,6 +190,5 @@ Level Up is a live commercial product. Publishing the full source would expose p
 
 - App Store: [LevelUp - AI](https://apps.apple.com/app/levelup-ai/id6756843363)
 - Website: [levelupself.app](https://levelupself.app)
-- LinkedIn: _add your profile URL_
 
 This repository does not accept public contributions. It is a portfolio case study, not an open-source application.
