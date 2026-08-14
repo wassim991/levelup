@@ -8,7 +8,7 @@ A production iOS app that turns a day of focus, training, and execution into a s
 
 **Live product:** [App Store](https://apps.apple.com/app/levelup-ai/id6756843363) · [levelupself.app](https://levelupself.app)
 
-This repository is a **public engineering case study**. The production source stays private. I can walk hiring managers through the real codebase on request.
+This repository is a **public engineering case study**. The production source stays private. 
 
 ---
 
