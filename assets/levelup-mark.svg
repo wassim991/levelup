@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-72 -82 144 110" fill="none" aria-hidden="true">
+  <defs>
+    <filter id="mark-glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+      <feColorMatrix
+        in="blur"
+        type="matrix"
+        values="0 0 0 0 0.298  0 0 0 0 0.788  0 0 0 0 1  0 0 0 0.55 0"
+      />
+      <feMerge>
+        <feMergeNode />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#mark-glow)">
+    <path fill="#ffffff" d="M0 -74 L32 -42 L-32 -42 Z" />
+    <rect x="-44" y="-26" width="88" height="16" rx="1" fill="#ffffff" opacity="0.7" />
+    <rect x="-64" y="2" width="128" height="16" rx="1" fill="#ffffff" opacity="0.4" />
+  </g>
+</svg>
