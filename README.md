@@ -1,201 +1,99 @@
-# Level Up
-
-An iOS app for planning, training, focus, and AI-assisted review — designed, engineered, and shipped independently.
-
 <p align="center">
-  <img src="assets/app-icon.jpg" alt="Level Up app icon" width="96" height="96">
+  <img src="assets/app-icon.jpg" alt="Level Up app icon" width="80" height="80">
 </p>
 
-**Live product:** [App Store](https://apps.apple.com/app/levelup-ai/id6756843363) · [levelupself.app](https://levelupself.app)
+<h1 align="center">Level Up</h1>
 
-This repository is a **public engineering case study**. The production source stays private.
+<p align="center">
+  <strong>Plan your day. Do the work. Review with AI.</strong><br>
+  A production iOS app, independently designed, engineered, and shipped by Wassim Akkash.
+</p>
 
-## Runnable engineering examples
+<p align="center">
+  <a href="https://apps.apple.com/app/levelup-ai/id6756843363">App Store</a> &nbsp;·&nbsp;
+  <a href="https://levelupself.app">Website</a> &nbsp;·&nbsp;
+  <a href="#explore-the-code">Explore the code</a>
+</p>
 
-For code, tests, and reproducible failure scenarios, start here:
+## The product
 
-- [LLM structured-output pipeline](https://github.com/wassim991/llm-structured-output-pipeline): schema validation, bounded repair, typed failures, and cancellation in TypeScript/Deno.
-- [Flutter offline sync demo](https://github.com/wassim991/flutter-offline-sync-demo): durable SQLite writes, an outbox, idempotent retry, realtime reconciliation, and an SSE lab.
+Level Up brings daily planning, training, focus sessions, and AI-assisted review into one iOS app. Its AI Judge uses recorded activity to help users reflect on their day; deterministic scoring engines own the numbers shown across the app.
 
-These are standalone demonstrations informed by LevelUp engineering work, not copies of the production implementation. Their READMEs distinguish real local behavior from simulated external services.
+I built the product from interface design through Flutter development, backend integration, testing, and App Store submission. This case study focuses on three engineering problems behind that work: **reliable AI output, streaming lifecycle, and durable offline state**.
 
----
+## Explore the code
 
-## Product
+Two public repositories make these patterns inspectable, with runnable examples and regression tests.
 
-Level Up is a self-improvement app for people who want structure instead of motivation. Users plan the day, run focus sessions, log training, and receive an AI Judge verdict grounded in what they actually did.
+| Example | What to look for |
+| :--- | :--- |
+| **[Structured-output pipeline](https://github.com/wassim991/llm-structured-output-pipeline)**<br>TypeScript · Deno · Zod | JSON parsing, strict schema validation, one repair attempt, typed failures, and a shared deadline. |
+| **[Offline sync demo](https://github.com/wassim991/flutter-offline-sync-demo)**<br>Flutter · Drift · SQLite | Atomic local writes, a durable outbox, stable operation IDs, lost acknowledgements, and duplicate echoes. |
+| **[SSE lab](https://github.com/wassim991/flutter-offline-sync-demo#sse-lab)**<br>Included in the Flutter demo | Split UTF-8 chunks, event buffering, paced text reveal, cancellation, and completion after the queue drains. |
 
-The App Store listing is under seller **Wassim Akkash** (`LevelUp - AI`). See the listing for current version and availability.
+These are standalone demonstrations informed by Level Up. The AI provider and remote sync service are simulated; the Flutter demo uses real local SQLite persistence. Each repository documents its boundaries and how to run the tests.
 
-Core product surfaces:
+## Three engineering problems
 
-- Daily planning and execution
-- Focus timers
-- Workout tracking and an interactive muscle map
-- Four pillars: Focus, Strength, Discipline, Energy
-- AI Judge for daily accountability
-- Premium subscription for expanded AI usage
+### 01 · Making AI output usable
 
----
+**Failure.** Shared backend preflight logic capped structured generation at 120 tokens, leaving too little room for complete AI plans. A successful request could still return an unusable payload.
 
-## Engineering
+**Change.** Preserve the required generation budget or reject before calling the model. Validate plan structure at the client and server boundaries, allow one bounded repair for the daily-plan flow, and return typed failures when recovery is exhausted.
 
-| Area | What shipped |
-| --- | --- |
-| Client | Flutter / Dart, iOS-first, Riverpod, GoRouter |
-| Local data | Drift / SQLite, outbox-based sync |
-| Backend | Supabase (Auth, PostgreSQL, Realtime, Edge Functions) |
-| Identity | Email, Sign in with Apple, Google Sign-In |
-| Billing | StoreKit via RevenueCat — offerings, entitlements, restore |
-| Health | Apple Health (HealthKit) for optional sleep → Biological Energy |
-| Scoring | Deterministic engines for user-visible numbers; AI writes verdict prose, not scores |
-| Observability | Sentry, structured error handling |
-| Web / compliance | Custom domain, privacy, terms, support, account deletion |
+**Verification.** Regression tests cover rejected output, repair, and complete drafts. The public pipeline isolates parsing, validation, bounded repair, and cancellation so those failure paths can be inspected independently.
 
-AI calls go through services and Edge Functions with typed request/response contracts. The UI does not call the model directly.
+### 02 · Finishing a stream without dumping the text
 
----
+**Failure.** A final SSE event could flush the remaining reveal queue, making text that had been streaming smoothly appear all at once.
 
-## Architecture
+**Change.** Separate transport completion from presentation completion. Mark the response complete only after the reveal queue drains; cancel pending work when the user leaves or cancels.
 
-Feature-first Flutter client, with a service layer between UI and backend.
+**Verification.** Burst-delivery and completion-before-reveal tests exercise the timing boundary. The public SSE lab also covers split byte sequences, malformed data, interrupted streams, and cancellation.
 
-```text
-┌─────────────────────────────────────────────────────────┐
-│                     iOS app (Flutter)                    │
-│  UI  →  Riverpod  →  Services  →  Local DB (Drift)      │
-│                         │                                │
-│                    Outbox / sync                         │
-└─────────────┬───────────────┬───────────────┬────────────┘
-              │               │               │
-              ▼               ▼               ▼
-        Supabase         RevenueCat      Apple Health
-     Auth · Postgres      StoreKit         HealthKit
-     Realtime · Edge
-              │
-              ▼
-     levelupself.app (legal, support, deletion)
+### 03 · Keeping local work through retries and echoes
+
+**Failure.** A completed focus session needs to survive offline use without being counted again when a retry or realtime echo arrives.
+
+**Change.** Persist locally with Drift, retain pending work in an outbox, and reuse stable operation IDs during synchronization. Reconcile incoming acknowledgements and echoes with existing local state.
+
+**Verification.** Local restoration and simulated echo tests check that completion is represented once. The public sync demo adds a reproducible lost-acknowledgement scenario and a disk-backed restart test.
+
+## System overview
+
+The Flutter client separates UI, state, services, and persistence. This diagram highlights the data and AI paths; billing and optional HealthKit access are separate integrations.
+
+```mermaid
+flowchart TD
+    UI[Flutter UI] --> State[Riverpod state]
+    State --> Services[Application services]
+    Services --> Local[Drift / SQLite]
+    Local --> Sync[Outbox / synchronization]
+    Sync <--> DB[Supabase / PostgreSQL]
+    Services --> Edge[Edge Functions / AI contracts]
+    Edge --> Model[Model provider]
 ```
 
-Local writes are durable first. Remote sync is asynchronous. User-visible scores have a declared canonical owner so Stats, Judge, and Home cannot invent competing numbers.
+Three boundaries guide the implementation:
 
-The production app follows a strict layering: **UI → providers → services → data**. Database access, billing, and AI inference are not done from widgets.
+- **Persist before syncing.** Local work remains available while remote synchronization catches up.
+- **Validate before using AI output.** Generated content must satisfy the application contract before it becomes an actionable plan.
+- **Keep one owner for scores.** Deterministic engines calculate values; AI supplies review language.
 
----
+## Stack and delivery
 
-## Engineering Challenges
+| Area | Technologies and responsibilities |
+| :--- | :--- |
+| Mobile | Flutter, Dart, Riverpod, GoRouter |
+| Data and backend | Drift, SQLite, Supabase Auth, PostgreSQL, Realtime, Edge Functions |
+| iOS integrations | RevenueCat, StoreKit, Sign in with Apple, optional HealthKit |
+| Quality | Unit, widget, and contract tests; regression testing; GitHub Actions; Sentry |
+| Delivery | Signed iOS builds, App Store submission, product and support website |
 
-### 1. Deterministic scores vs AI language
-
-**Problem.** An AI Judge that both narrates the day and invents the score will drift. Two screens would disagree; App Review and users would not trust the number.
-
-**Decision.** Split authority. Math owns Focus, Strength, Discipline, Energy, and related display scores. A formula registry records the canonical owner, inputs, range, and rounding. AI may write verdict prose and a tone band. It must not own the number the user sees.
-
-**Result.** Scoring is testable. Judge Chat shows tone, not a competing `/10`. Stats and judgment stay aligned.
-
-### 2. Local-first work vs remote truth
-
-**Problem.** Focus sessions and workouts cannot disappear because the network dropped. Multi-device and retry also cannot double-apply the same session.
-
-**Decision.** Persist locally (SQLite), enqueue mutations in an outbox, sync when the network is available, and reconcile with remote rows. Realtime is used to refresh, not as the source of truth.
-
-**Result.** Execution still records offline. Sync is an engineering problem with tests, not a spinner around a live query.
-
-### 3. Subscriptions that match the App Store
-
-**Problem.** StoreKit, restore, trial, expiry, and premium gates fail in ways that look like product bugs. A second billing path would split truth.
-
-**Decision.** Ship iOS billing through RevenueCat and a single premium entitlement. Cache entitlement state for launch, restore through the store, and keep paywall copy store-safe.
-
-**Result.** Premium is an entitlement, not a flag flipped in the client.
-
-### 4. HealthKit without leaking health data into AI
-
-**Problem.** Apple Review rejects vague HealthKit use. Sending raw sleep samples to a model is both a privacy and a review failure.
-
-**Decision.** HealthKit is optional. Permitted sleep reads feed Biological Energy. Raw samples, stages, timestamps, and HealthKit identifiers are not sent to the model. Users can continue without connecting Apple Health. Privacy copy, system usage strings, and contract tests have to match.
-
-**Result.** The HealthKit path is reviewable: optional, disclosed, and bounded.
-
-### 5. Shipping through App Review, not past it
-
-**Problem.** A Flutter app with AI, HealthKit, subscriptions, and account deletion will be rejected on process, not only on crashes.
-
-**Decision.** Treat review as an engineering surface: privacy nutrition labels, in-app and web account deletion, AI disclosure, subscription terms, signed release builds, and written review responses for successive builds.
-
-**Result.** Version 1.0 is on the App Store. The legal site is live for the same product.
+The [product website](https://levelupself.app) also hosts privacy, terms, support, and [account-deletion information](https://levelupself.app/delete-account).
 
 ---
 
-## Testing & Reliability
+**About this repository** — Level Up is a commercial product; its production source remains private. This repository documents the engineering work. The [public examples](#explore-the-code) provide generalized implementations and executable tests.
 
-The production repository (private) contains:
-
-- Hundreds of Dart unit/widget/contract tests
-- Backend/Edge Function tests
-- GitHub Actions for analyze, test, release, and secrets presence
-- Contract tests for scoring ownership, HealthKit privacy strings, and billing identifiers
-- Sentry for production failures
-
-The public examples linked above provide runnable tests. This section describes the private app; its full test suite is not included in this repository.
-
----
-
-## Shipping to Production
-
-Release work covered the following surfaces:
-
-| Gate | What exists |
-| --- | --- |
-| Store | App Store listing, seller Wassim Akkash |
-| Billing | App Store Connect products + RevenueCat offering/entitlement |
-| Privacy | Privacy policy, terms, AI disclosure, HealthKit usage strings |
-| Deletion | In-app flow and [levelupself.app/delete-account](https://levelupself.app/delete-account) |
-| Release | Signed iOS archives, build numbers, App Review remediation |
-| Ops | Edge Functions, Sentry, CI |
-
----
-
-## Web Platform
-
-**[levelupself.app](https://levelupself.app)** presents the product and hosts its privacy, terms, support, and account-deletion information.
-
-Website responsibilities:
-
-- Custom domain and HTTPS
-- Privacy, terms, support
-- Account deletion instructions
-- Deployed as a static site (Vercel)
-
-It exists because App Store distribution requires reachable legal and deletion URLs. Design, copy, hosting, DNS, and SSL were part of shipping the product.
-
----
-
-## Tech Stack
-
-**Client:** Flutter, Dart, Riverpod, GoRouter, SQLite  
-**iOS:** StoreKit, Sign in with Apple, HealthKit  
-**Backend:** Supabase, PostgreSQL, Row-Level Security, Edge Functions  
-**Billing:** RevenueCat  
-**Quality:** automated tests, GitHub Actions, Sentry
-
----
-
-## What I Owned
-
-I built Level Up independently: product design, Flutter/iOS engineering, backend, billing, HealthKit, testing, App Store submission, and the legal website.
-
----
-
-## Source availability
-
-LevelUp is a commercial product and its production source remains private. The linked public repositories demonstrate selected engineering patterns with generalized data, documented trade-offs, and executable tests.
-
----
-
-## Links
-
-- App Store: [LevelUp - AI](https://apps.apple.com/app/levelup-ai/id6756843363)
-- Website: [levelupself.app](https://levelupself.app)
-
-This repository documents the product. For implementation details and runnable tests, use the engineering examples linked above.
+Built by **[Wassim Akkash](https://github.com/wassim991)** · Software Engineer · AI Systems · Mobile
