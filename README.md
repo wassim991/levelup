@@ -1,6 +1,6 @@
 # Level Up
 
-A production iOS app that turns a day of focus, training, and execution into a scored judgment — designed, engineered, and shipped independently.
+An iOS app for planning, training, focus, and AI-assisted review — designed, engineered, and shipped independently.
 
 <p align="center">
   <img src="assets/app-icon.jpg" alt="Level Up app icon" width="96" height="96">
@@ -8,7 +8,16 @@ A production iOS app that turns a day of focus, training, and execution into a s
 
 **Live product:** [App Store](https://apps.apple.com/app/levelup-ai/id6756843363) · [levelupself.app](https://levelupself.app)
 
-This repository is a **public engineering case study**. The production source stays private. 
+This repository is a **public engineering case study**. The production source stays private.
+
+## Runnable engineering examples
+
+For code, tests, and reproducible failure scenarios, start here:
+
+- [LLM structured-output pipeline](https://github.com/wassim991/llm-structured-output-pipeline): schema validation, bounded repair, typed failures, and cancellation in TypeScript/Deno.
+- [Flutter offline sync demo](https://github.com/wassim991/flutter-offline-sync-demo): durable SQLite writes, an outbox, idempotent retry, realtime reconciliation, and an SSE lab.
+
+These are standalone demonstrations informed by LevelUp engineering work, not copies of the production implementation. Their READMEs distinguish real local behavior from simulated external services.
 
 ---
 
@@ -16,7 +25,7 @@ This repository is a **public engineering case study**. The production source st
 
 Level Up is a self-improvement app for people who want structure instead of motivation. Users plan the day, run focus sessions, log training, and receive an AI Judge verdict grounded in what they actually did.
 
-The App Store listing is live under seller **Wassim Akkash** (`LevelUp - AI`, version 1.0, released August 2026).
+The App Store listing is under seller **Wassim Akkash** (`LevelUp - AI`). See the listing for current version and availability.
 
 Core product surfaces:
 
@@ -128,17 +137,17 @@ The production repository (private) contains:
 - Contract tests for scoring ownership, HealthKit privacy strings, and billing identifiers
 - Sentry for production failures
 
-This is not a screenshot-only prototype. Scoring, entitlements, HealthKit disclosures, and sync behavior are asserted in tests.
+The public examples linked above provide runnable tests. This section describes the private app; its full test suite is not included in this repository.
 
 ---
 
 ## Shipping to Production
 
-Level Up is a released product, not a campus demo.
+Release work covered the following surfaces:
 
 | Gate | What exists |
 | --- | --- |
-| Store | App Store listing, seller Wassim Akkash, version 1.0 |
+| Store | App Store listing, seller Wassim Akkash |
 | Billing | App Store Connect products + RevenueCat offering/entitlement |
 | Privacy | Privacy policy, terms, AI disclosure, HealthKit usage strings |
 | Deletion | In-app flow and [levelupself.app/delete-account](https://levelupself.app/delete-account) |
@@ -149,9 +158,9 @@ Level Up is a released product, not a campus demo.
 
 ## Web Platform
 
-**[levelupself.app](https://levelupself.app)** is the compliance and support site, not a second app.
+**[levelupself.app](https://levelupself.app)** presents the product and hosts its privacy, terms, support, and account-deletion information.
 
-Verified live:
+Website responsibilities:
 
 - Custom domain and HTTPS
 - Privacy, terms, support
@@ -176,13 +185,11 @@ It exists because App Store distribution requires reachable legal and deletion U
 
 I built Level Up independently: product design, Flutter/iOS engineering, backend, billing, HealthKit, testing, App Store submission, and the legal website.
 
-The App Store seller name and the git author are the same person. There was no separate mobile team, backend team, or design agency.
-
 ---
 
-## Why the source is private
+## Source availability
 
-Level Up is a live commercial product. Publishing the full source would expose proprietary scoring, AI contracts, billing catalogs, and backend attack surface. A case study plus a live App Store build is the honest portfolio. I will walk through architecture and code in interviews.
+LevelUp is a commercial product and its production source remains private. The linked public repositories demonstrate selected engineering patterns with generalized data, documented trade-offs, and executable tests.
 
 ---
 
@@ -191,4 +198,4 @@ Level Up is a live commercial product. Publishing the full source would expose p
 - App Store: [LevelUp - AI](https://apps.apple.com/app/levelup-ai/id6756843363)
 - Website: [levelupself.app](https://levelupself.app)
 
-This repository does not accept public contributions. It is a portfolio case study, not an open-source application.
+This repository documents the product. For implementation details and runnable tests, use the engineering examples linked above.
