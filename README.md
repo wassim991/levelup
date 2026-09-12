@@ -2,98 +2,95 @@
   <img src="assets/app-icon.jpg" alt="Level Up app icon" width="80" height="80">
 </p>
 
-<h1 align="center">Level Up</h1>
+<h1 align="center">Level Up · Engineering Case Study</h1>
 
 <p align="center">
-  <strong>Plan your day. Do the work. Review with AI.</strong><br>
-  A production iOS app, independently designed, engineered, and shipped by Wassim Akkash.
+  <strong>Shipping AI features means owning their failure modes.</strong><br>
+  A production iOS app, independently designed, built, and shipped by Wassim Akkash.
 </p>
 
 <p align="center">
   <a href="https://apps.apple.com/app/levelup-ai/id6756843363">App Store</a> &nbsp;·&nbsp;
-  <a href="https://levelupself.app">Website</a> &nbsp;·&nbsp;
-  <a href="#explore-the-code">Explore the code</a>
+  <a href="https://levelupself.app">Product website</a> &nbsp;·&nbsp;
+  <a href="#three-decisions-behind-the-product">Engineering decisions</a> &nbsp;·&nbsp;
+  <a href="docs/verification.md">Run the evidence</a>
 </p>
 
-## The product
+## What I built
 
-Level Up brings daily planning, training, focus sessions, and AI-assisted review into one iOS app. Its AI Judge uses recorded activity to help users reflect on their day; deterministic scoring engines own the numbers shown across the app.
+Level Up combines daily planning, training, focus sessions, and AI-assisted review. I took it from product design to App Store release, working across the Flutter client, Supabase backend, local persistence, AI flows, and iOS integrations.
 
-I built the product from interface design through Flutter development, backend integration, testing, and App Store submission. This case study focuses on three engineering problems behind that work: **reliable AI output, streaming lifecycle, and durable offline state**.
+The hard part was making those pieces behave correctly when a model returned an incomplete plan, a stream finished before the UI did, or a local completion came back as a realtime echo.
 
-## Explore the code
+This case study follows those three problems from **failure → decision → verification**. Production source stays private; the linked public examples use generalized data and simulated external services.
 
-Two public repositories make these patterns inspectable, with runnable examples and regression tests.
+## Three decisions behind the product
 
-| Example | What to look for |
+### 01 · A shorter response can be a broken response
+
+Failed AI plans led me to shared preflight logic that reduced structured generation to **120 tokens**. That fallback left too little room for a complete plan.
+
+I changed full-plan requests to preserve their required output budget or reject before generation. Validation and one bounded repair handle malformed daily-plan output separately. The key distinction: **budget approval and output validity are different checks**.
+
+The public TypeScript example makes the second boundary inspectable: strict schema checks, at most one repair, typed failures, and one deadline across both calls.
+
+**[Read the investigation](docs/ai-plan-reliability.md)** · [Implementation][pipeline] · [Regression tests][pipeline-tests]
+
+### 02 · Network completion is not UI completion
+
+Chat replies could appear all at once because the final SSE event flushed text still waiting to be revealed. The network was done; the presentation was not.
+
+I changed completion to wait for the reveal queue to drain. Burst-delivery and completion-before-reveal tests pin that ordering. The public SSE lab isolates the same lifecycle alongside byte decoding, interruption, and cancellation.
+
+**[Read the investigation](docs/streaming-lifecycle.md)** · [Implementation][stream] · [Regression tests][stream-tests]
+
+### 03 · A server echo is not a second completion
+
+Focus tracking records work locally, then synchronizes it. A realtime echo must update that state without publishing another completion and counting the same session again.
+
+I used Drift persistence and queued Supabase writes with stable operation IDs, then tested local restoration and simulated echoes. The public sync demo makes a related failure easy to reproduce: **the server commits, the acknowledgement is lost, and the client retries**.
+
+**[Read the investigation](docs/offline-consistency.md)** · [Local store][store] · [Retry worker][worker] · [Regression tests][sync-tests]
+
+## Inspect and run
+
+| Public example | What runs locally |
 | :--- | :--- |
-| **[Structured-output pipeline](https://github.com/wassim991/llm-structured-output-pipeline)**<br>TypeScript · Deno · Zod | JSON parsing, strict schema validation, one repair attempt, typed failures, and a shared deadline. |
-| **[Offline sync demo](https://github.com/wassim991/flutter-offline-sync-demo)**<br>Flutter · Drift · SQLite | Atomic local writes, a durable outbox, stable operation IDs, lost acknowledgements, and duplicate echoes. |
-| **[SSE lab](https://github.com/wassim991/flutter-offline-sync-demo#sse-lab)**<br>Included in the Flutter demo | Split UTF-8 chunks, event buffering, paced text reveal, cancellation, and completion after the queue drains. |
+| **[LLM structured-output pipeline](https://github.com/wassim991/llm-structured-output-pipeline)** | TypeScript / Deno / Zod. Scripted provider responses exercise validation, repair, deadlines, and cancellation. |
+| **[Flutter offline sync demo](https://github.com/wassim991/flutter-offline-sync-demo)** | Real Drift / SQLite persistence, an in-memory simulated backend, and a separate SSE lab with byte-stream fixtures. |
 
-These are standalone demonstrations informed by Level Up. The AI provider and remote sync service are simulated; the Flutter demo uses real local SQLite persistence. Each repository documents its boundaries and how to run the tests.
+**Verified September 12, 2026:** 26 Deno tests and 17 Flutter tests passed locally. Both linked revisions also have successful GitHub Actions runs. [Commands, revisions, CI results, and limits →](docs/verification.md)
 
-## Three engineering problems
-
-### 01 · Making AI output usable
-
-**Failure.** Shared backend preflight logic capped structured generation at 120 tokens, leaving too little room for complete AI plans. A successful request could still return an unusable payload.
-
-**Change.** Preserve the required generation budget or reject before calling the model. Validate plan structure at the client and server boundaries, allow one bounded repair for the daily-plan flow, and return typed failures when recovery is exhausted.
-
-**Verification.** Regression tests cover rejected output, repair, and complete drafts. The public pipeline isolates parsing, validation, bounded repair, and cancellation so those failure paths can be inspected independently.
-
-### 02 · Finishing a stream without dumping the text
-
-**Failure.** A final SSE event could flush the remaining reveal queue, making text that had been streaming smoothly appear all at once.
-
-**Change.** Separate transport completion from presentation completion. Mark the response complete only after the reveal queue drains; cancel pending work when the user leaves or cancels.
-
-**Verification.** Burst-delivery and completion-before-reveal tests exercise the timing boundary. The public SSE lab also covers split byte sequences, malformed data, interrupted streams, and cancellation.
-
-### 03 · Keeping local work through retries and echoes
-
-**Failure.** A completed focus session needs to survive offline use without being counted again when a retry or realtime echo arrives.
-
-**Change.** Persist locally with Drift, retain pending work in an outbox, and reuse stable operation IDs during synchronization. Reconcile incoming acknowledgements and echoes with existing local state.
-
-**Verification.** Local restoration and simulated echo tests check that completion is represented once. The public sync demo adds a reproducible lost-acknowledgement scenario and a disk-backed restart test.
-
-## System overview
-
-The Flutter client separates UI, state, services, and persistence. This diagram highlights the data and AI paths; billing and optional HealthKit access are separate integrations.
+## How the pieces connect
 
 ```mermaid
 flowchart TD
-    UI[Flutter UI] --> State[Riverpod state]
-    State --> Services[Application services]
+    Client[Flutter UI / Riverpod] --> Services[Application services]
     Services --> Local[Drift / SQLite]
-    Local --> Sync[Outbox / synchronization]
+    Local --> Sync[Outbox / sync]
     Sync <--> DB[Supabase / PostgreSQL]
-    Services --> Edge[Edge Functions / AI contracts]
-    Edge --> Model[Model provider]
+    Services --> AI[Edge Functions / AI contracts]
+    AI --> Model[Model provider]
 ```
 
-Three boundaries guide the implementation:
+This diagram shows the data and AI paths. RevenueCat / StoreKit billing and optional HealthKit access are separate integrations. Deterministic engines own user-visible scores; the AI supplies review language.
 
-- **Persist before syncing.** Local work remains available while remote synchronization catches up.
-- **Validate before using AI output.** Generated content must satisfy the application contract before it becomes an actionable plan.
-- **Keep one owner for scores.** Deterministic engines calculate values; AI supplies review language.
-
-## Stack and delivery
-
-| Area | Technologies and responsibilities |
+| Area | Stack |
 | :--- | :--- |
-| Mobile | Flutter, Dart, Riverpod, GoRouter |
-| Data and backend | Drift, SQLite, Supabase Auth, PostgreSQL, Realtime, Edge Functions |
-| iOS integrations | RevenueCat, StoreKit, Sign in with Apple, optional HealthKit |
-| Quality | Unit, widget, and contract tests; regression testing; GitHub Actions; Sentry |
-| Delivery | Signed iOS builds, App Store submission, product and support website |
+| Client and data | Flutter, Dart, Riverpod, GoRouter, Drift, SQLite |
+| Backend and AI | Supabase Auth, PostgreSQL, Realtime, Edge Functions, LLM integration |
+| Integrations and delivery | RevenueCat, StoreKit, HealthKit, Sentry, GitHub Actions, App Store release |
 
-The [product website](https://levelupself.app) also hosts privacy, terms, support, and [account-deletion information](https://levelupself.app/delete-account).
+## What this work taught me
 
----
+A fallback has to preserve what the feature promises. A completion event needs an explicit owner. A successful write and its acknowledgement are separate events. Those distinctions now shape how I design failure paths and choose regression tests.
 
-**About this repository** — Level Up is a commercial product; its production source remains private. This repository documents the engineering work. The [public examples](#explore-the-code) provide generalized implementations and executable tests.
+Built by **[Wassim Akkash](https://github.com/wassim991)** · Software Engineer · AI Systems · Product
 
-Built by **[Wassim Akkash](https://github.com/wassim991)** · Software Engineer · AI Systems · Mobile
+[pipeline]: https://github.com/wassim991/llm-structured-output-pipeline/blob/3eccf725b333367cd9539aa980ade9d8d294c7b9/src/pipeline.ts
+[pipeline-tests]: https://github.com/wassim991/llm-structured-output-pipeline/blob/3eccf725b333367cd9539aa980ade9d8d294c7b9/tests/pipeline_test.ts
+[stream]: https://github.com/wassim991/flutter-offline-sync-demo/blob/30b143d39f8db679cb605e176ed87c17a4dd88bd/lib/streaming/sse.dart
+[stream-tests]: https://github.com/wassim991/flutter-offline-sync-demo/blob/30b143d39f8db679cb605e176ed87c17a4dd88bd/test/sse_test.dart
+[store]: https://github.com/wassim991/flutter-offline-sync-demo/blob/30b143d39f8db679cb605e176ed87c17a4dd88bd/lib/data/store.dart
+[worker]: https://github.com/wassim991/flutter-offline-sync-demo/blob/30b143d39f8db679cb605e176ed87c17a4dd88bd/lib/sync/worker.dart
+[sync-tests]: https://github.com/wassim991/flutter-offline-sync-demo/blob/30b143d39f8db679cb605e176ed87c17a4dd88bd/test/sync_test.dart
